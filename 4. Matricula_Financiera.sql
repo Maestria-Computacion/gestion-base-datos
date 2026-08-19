@@ -1,12 +1,19 @@
 -- ============================================================================
--- 02_Matricula_Financiera.sql
+-- 4. Matricula_Financiera.sql
 -- Tablas del módulo de Matrícula Financiera (MF) y del flujo de solicitudes
 -- de becas/descuentos que MF consume para la vista de detalle del estudiante.
 --
--- Ejecutar después de 01_Base_Comun.sql (requiere estudiantes, grupo,
--- periodo_academico y personas).
+-- Ejecutar después de 1, 2 y 3 (requiere estudiantes, personas).
 -- No incluye datos de prueba: solo estructura y el tipo de solicitud
 -- RE_MATR (Revisión de Matrícula), agregado por este trabajo.
+--
+-- Incluye tambien `grupo`, `periodo_academico` y `estudiantes.es_egresado_unicauca`,
+-- que no forman parte del script oficial de base de datos del programa
+-- (`1. SCRIPT_FINAL_BASE_DATOS_MAESTRIA_V3.sql`): `grupo` la crea Hibernate del
+-- microservicio de Informacion Presupuestaria (ddl-auto), `periodo_academico`
+-- la crea el script propio de Matricula Academica (fuera de este repositorio),
+-- y `es_egresado_unicauca` es un atributo financiero agregado por este trabajo.
+-- Se agregan aqui porque este es el primer script que las necesita por FK.
 --
 -- Las tablas del flujo de solicitudes (tipos_solicitudes, solicitudes,
 -- solicitud_beca_descuento, solicitudes_en_comite, solicitudes_en_concejo,
@@ -21,7 +28,44 @@ USE `maestria-computacion`;
 SET sql_notes = 0;
 
 -- ----------------------------------------------------------------------------
--- 1. MATRICULA_FINANCIERA
+-- 1. GRUPO (grupos de investigacion)
+-- GTI, IDIS, GICO. Consumido por MF (grupo del estudiante) e IP (reporte por grupos).
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS grupo (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    nombre VARCHAR(100) NOT NULL UNIQUE,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='GTI, IDIS, GICO, etc';
+
+INSERT IGNORE INTO grupo (nombre) VALUES ('GTI'), ('IDIS'), ('GICO');
+
+-- ----------------------------------------------------------------------------
+-- 2. PERIODO_ACADEMICO
+-- El estado PROYECCION se agrego para el modulo de Informacion Presupuestaria
+-- (permite periodos en fase de proyeccion).
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS periodo_academico (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    tag_periodo INT NOT NULL COMMENT '1 = primer semestre, 2 = segundo semestre',
+    fecha_inicio DATE NOT NULL,
+    fecha_fin DATE NOT NULL,
+    fecha_fin_matricula DATE NOT NULL,
+    descripcion VARCHAR(255) NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'ACTIVO' COMMENT 'ACTIVO | INACTIVO | FINALIZADO | PROYECCION',
+    estudiantes_nuevos_esperados INT DEFAULT 0 COMMENT 'Cantidad de estudiantes nuevos esperados en proyeccion',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_periodo_tag_anio (tag_periodo, fecha_inicio)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ----------------------------------------------------------------------------
+-- 3. ESTUDIANTES.ES_EGRESADO_UNICAUCA (atributo financiero agregado por MF)
+-- (requiere MySQL 8.0.29+ para ADD COLUMN IF NOT EXISTS; si la BD ya tiene
+-- esta columna por fuera de este trabajo, la instruccion no falla)
+-- ----------------------------------------------------------------------------
+ALTER TABLE estudiantes ADD COLUMN IF NOT EXISTS es_egresado_unicauca BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- ----------------------------------------------------------------------------
+-- 4. MATRICULA_FINANCIERA
 -- Fuente de verdad del estado de pago real y del grupo asignado por período.
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS matricula_financiera (
@@ -40,10 +84,10 @@ CREATE TABLE IF NOT EXISTS matricula_financiera (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Estado de pago real y grupo asignado';
 
 -- ----------------------------------------------------------------------------
--- 2. TIPOS_SOLICITUDES
+-- 5. TIPOS_SOLICITUDES
 -- Catálogo de tipos de solicitud del sistema de Gestión de Solicitudes.
 -- Los tipos existentes (CER_VOTO, etc.) los administra ms-gestion-solicitudes;
--- RE_MATR se agrega en el script 04 y CER_VOTO en el script 06.
+-- RE_MATR se agrega en el script 6 y CER_VOTO en el script 8.
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS tipos_solicitudes (
     id BIGINT NOT NULL AUTO_INCREMENT,
@@ -60,7 +104,7 @@ CREATE TABLE IF NOT EXISTS tipos_solicitudes (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------------------------------------------------------
--- 3. FLUJO DE SOLICITUDES (Becas y Descuentos)
+-- 6. FLUJO DE SOLICITUDES (Becas y Descuentos)
 -- id_tutor es NULL para tipos de solicitud que no requieren tutor (ej. CER_VOTO).
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS solicitudes (
@@ -124,7 +168,7 @@ CREATE TABLE IF NOT EXISTS solicitudes_en_concejo (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------------------------------------------------------
--- 4. REQUISITOS_SOLICITUD
+-- 7. REQUISITOS_SOLICITUD
 -- Mensaje informativo que ve el estudiante antes de radicar una solicitud
 -- (título, descripción, artículo y consideraciones) por tipo de solicitud.
 -- Los flujos RE_MATR y CER_VOTO usan esta tabla para mostrar el mensaje previo.
@@ -145,7 +189,7 @@ CREATE TABLE IF NOT EXISTS requisitos_solicitud (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------------------------------------------------------
--- 5. DOCUMENTOS_REQUISITOS_SOLICITUD
+-- 8. DOCUMENTOS_REQUISITOS_SOLICITUD
 -- Documentos que deben adjuntarse por requisito de solicitud.
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS documentos_requisitos_solicitud (
