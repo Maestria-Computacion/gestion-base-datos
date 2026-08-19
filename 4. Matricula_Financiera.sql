@@ -7,6 +7,14 @@
 -- periodo_academico y personas).
 -- No incluye datos de prueba: solo estructura y el tipo de solicitud
 -- RE_MATR (Revisión de Matrícula), agregado por este trabajo.
+--
+-- Las tablas del flujo de solicitudes (tipos_solicitudes, solicitudes,
+-- solicitud_beca_descuento, solicitudes_en_comite, solicitudes_en_concejo,
+-- requisitos_solicitud, documentos_requisitos_solicitud) las administra
+-- ms-gestion-solicitudes (corre con ddl-auto=update); su estructura aquí
+-- fue verificada contra las entidades JPA reales de ese microservicio para
+-- que coincida exactamente con la tabla real, incluso si ya existe por
+-- fuera de este trabajo (ver 00_README.md).
 -- ============================================================================
 
 USE `maestria-computacion`;
@@ -35,13 +43,15 @@ CREATE TABLE IF NOT EXISTS matricula_financiera (
 -- 2. TIPOS_SOLICITUDES
 -- Catálogo de tipos de solicitud del sistema de Gestión de Solicitudes.
 -- Los tipos existentes (CER_VOTO, etc.) los administra ms-gestion-solicitudes;
--- RE_MATR se agrega en el script 04.
+-- RE_MATR se agrega en el script 04 y CER_VOTO en el script 06.
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS tipos_solicitudes (
     id BIGINT NOT NULL AUTO_INCREMENT,
     codigo TEXT NOT NULL,
     nombre TEXT NOT NULL,
     estado VARCHAR(50),
+    fecha_inicio TEXT NULL,
+    fecha_final TEXT NULL,
     usuario_creacion INT NOT NULL DEFAULT 1 CHECK (usuario_creacion > 0),
     fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     usuario_modificacion INT NOT NULL DEFAULT 1 CHECK (usuario_modificacion > 0),
@@ -51,43 +61,65 @@ CREATE TABLE IF NOT EXISTS tipos_solicitudes (
 
 -- ----------------------------------------------------------------------------
 -- 3. FLUJO DE SOLICITUDES (Becas y Descuentos)
+-- id_tutor es NULL para tipos de solicitud que no requieren tutor (ej. CER_VOTO).
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS solicitudes (
     id BIGINT NOT NULL AUTO_INCREMENT,
     id_tipo_solicitud BIGINT NOT NULL,
     id_estudiante BIGINT NOT NULL,
     id_tutor BIGINT NULL,
+    id_director BIGINT NULL,
     estado VARCHAR(50) NULL,
-    radicado VARCHAR(50) NULL,
+    requiere_firma_director BOOLEAN NOT NULL DEFAULT FALSE,
+    documento_firmado MEDIUMTEXT NULL,
+    radicado VARCHAR(10) NULL,
+    comentario TEXT NULL,
+    id_revisor BIGINT NULL,
+    usuario_creacion INT NOT NULL DEFAULT 1 CHECK (usuario_creacion > 0),
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    usuario_modificacion INT NOT NULL DEFAULT 1 CHECK (usuario_modificacion > 0),
+    fecha_modificacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     CONSTRAINT fk_sol_tipo FOREIGN KEY (id_tipo_solicitud) REFERENCES tipos_solicitudes (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS solicitud_beca_descuento (
+    id BIGINT NOT NULL AUTO_INCREMENT,
     id_solicitud BIGINT NOT NULL,
-    tipo VARCHAR(100) NOT NULL,
-    motivo VARCHAR(255) NULL,
-    PRIMARY KEY (id_solicitud),
+    tipo VARCHAR(200) NOT NULL,
+    motivo TEXT NULL,
+    formato_solicitud MEDIUMTEXT NULL,
+    PRIMARY KEY (id),
     CONSTRAINT fk_sbd_solicitud FOREIGN KEY (id_solicitud) REFERENCES solicitudes (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS solicitudes_en_comite (
+    id BIGINT NOT NULL AUTO_INCREMENT,
     id_solicitud BIGINT NOT NULL,
     avalado_comite VARCHAR(2) NULL,
-    concepto_comite VARCHAR(255) NULL,
-    PRIMARY KEY (id_solicitud),
+    concepto_comite TEXT NULL,
+    numero_acta VARCHAR(200) NULL,
+    fecha_aval DATE NULL,
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_comite_solicitud (id_solicitud),
     CONSTRAINT fk_comite_solicitud FOREIGN KEY (id_solicitud) REFERENCES solicitudes (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS solicitudes_en_concejo (
     id BIGINT NOT NULL AUTO_INCREMENT,
     id_solicitud BIGINT NOT NULL,
-    porcentaje DECIMAL(5,2) NULL,
     avalado_concejo VARCHAR(2) NULL,
+    concepto_concejo TEXT NULL,
+    numero_acta VARCHAR(200) NULL,
+    fecha_aval DATE NULL,
+    porcentaje DECIMAL(5,2) NULL,
     resolucion VARCHAR(100) NULL,
     fecha_inicio DATE NULL,
     fecha_fin DATE NULL,
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
+    UNIQUE KEY uk_concejo_solicitud (id_solicitud),
     CONSTRAINT fk_sol_concejo_id_sol FOREIGN KEY (id_solicitud) REFERENCES solicitudes (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -95,7 +127,7 @@ CREATE TABLE IF NOT EXISTS solicitudes_en_concejo (
 -- 4. REQUISITOS_SOLICITUD
 -- Mensaje informativo que ve el estudiante antes de radicar una solicitud
 -- (título, descripción, artículo y consideraciones) por tipo de solicitud.
--- El flujo RE_MATR usa esta tabla para mostrar las consideraciones previas.
+-- Los flujos RE_MATR y CER_VOTO usan esta tabla para mostrar el mensaje previo.
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS requisitos_solicitud (
     id BIGINT NOT NULL AUTO_INCREMENT,
@@ -121,6 +153,8 @@ CREATE TABLE IF NOT EXISTS documentos_requisitos_solicitud (
     nombre_documento TEXT NOT NULL,
     id_requisito_solicitud BIGINT NOT NULL,
     adjuntar_documento BOOLEAN NOT NULL DEFAULT TRUE,
+    abreviatura_documento VARCHAR(100) NULL,
+    enlace BOOLEAN NULL DEFAULT FALSE,
     usuario_creacion INT NOT NULL DEFAULT 1 CHECK (usuario_creacion > 0),
     fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     usuario_modificacion INT NOT NULL DEFAULT 1 CHECK (usuario_modificacion > 0),

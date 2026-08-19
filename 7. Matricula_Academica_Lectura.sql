@@ -63,8 +63,8 @@ CREATE TABLE IF NOT EXISTS cursos (
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-ALTER TABLE cursos ADD COLUMN id_asignatura BIGINT NULL;
-ALTER TABLE cursos ADD COLUMN periodo_id BIGINT NULL;
+ALTER TABLE cursos ADD COLUMN IF NOT EXISTS id_asignatura BIGINT NULL;
+ALTER TABLE cursos ADD COLUMN IF NOT EXISTS periodo_id BIGINT NULL;
 
 -- ----------------------------------------------------------------------------
 -- 3. DOCENTES
@@ -105,10 +105,10 @@ CREATE TABLE IF NOT EXISTS matriculas (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 ALTER TABLE matriculas MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT;
-ALTER TABLE matriculas ADD COLUMN id_curso INT NULL;
-ALTER TABLE matriculas ADD COLUMN id_periodo BIGINT NULL;
-ALTER TABLE matriculas ADD COLUMN estado_matricula VARCHAR(50) NULL;
-ALTER TABLE matriculas ADD COLUMN observacion VARCHAR(255) NULL;
+ALTER TABLE matriculas ADD COLUMN IF NOT EXISTS id_curso INT NULL;
+ALTER TABLE matriculas ADD COLUMN IF NOT EXISTS id_periodo BIGINT NULL;
+ALTER TABLE matriculas ADD COLUMN IF NOT EXISTS estado_matricula VARCHAR(50) NULL;
+ALTER TABLE matriculas ADD COLUMN IF NOT EXISTS observacion VARCHAR(255) NULL;
 
 -- ----------------------------------------------------------------------------
 -- 5. CURSO_DOCENTE (asignación docente a cursos)
